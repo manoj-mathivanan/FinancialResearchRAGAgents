@@ -1,0 +1,35 @@
+[
+  {
+    "name": "December growth plus margin commentary",
+    "question": "How much did Infosys consolidated INR revenue grow year over year in the December 2025 quarter, and what did management say about the labor-code effect on operating margins?",
+    "expected_route": {"period_end": "2025-12-31", "metric": "revenue", "uses_transcript": true},
+    "expected_status": "answered",
+    "expected_calculation": {
+      "percent_change": "8.90",
+      "prior": {"period_end": "2024-12-31", "value": "41764"},
+      "current": {"period_end": "2025-12-31", "value": "45479"}
+    },
+    "expected_citations": [
+      {"pattern": "8\\.90?\\s*%", "source": {"type": "filing_calculation"}},
+      {"pattern": "18\\.4\\s*%", "source": {"pdf_page": 21, "period_end": "2025-12-31"}},
+      {"pattern": "21\\.2\\s*%", "source": {"pdf_page": 21, "period_end": "2025-12-31"}}
+    ],
+    "review_note": "The audited filings support the reported INR calculation. Printed transcript page 4 gives 18.4% reported margin and 21.2% after excluding the labor-code impact. Check that the answer distinguishes the two margins and does not attribute revenue growth to the charge."
+  },
+  {
+    "name": "Missing prior-year input",
+    "question": "How much did Infosys consolidated INR revenue grow year over year in the December 2024 quarter?",
+    "expected_route": {"period_end": "2024-12-31", "metric": "revenue", "uses_transcript": false},
+    "expected_status": "insufficient_evidence",
+    "expected_gap": "2023-12-31",
+    "review_note": "The local snapshot includes December 2024 but lacks the December 2023 quarter. The workflow should name the missing input."
+  },
+  {
+    "name": "Ambiguous reporting quarter",
+    "question": "How much did Infosys revenue grow year over year?",
+    "expected_route": {"period_end": null},
+    "expected_status": "insufficient_evidence",
+    "expected_gap": "Specify one supported Infosys reporting quarter",
+    "review_note": "The question supplies no reporting quarter. The workflow should request a quarter rather than guess."
+  }
+]

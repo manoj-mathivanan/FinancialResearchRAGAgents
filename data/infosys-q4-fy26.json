@@ -1,0 +1,19 @@
+{
+  "snapshot_id": "infosys-q4-fy26-v1",
+  "company": "Infosys",
+  "symbol": "INFY",
+  "scope": "consolidated",
+  "accounting_basis": "Ind AS",
+  "unit": "INR crore",
+  "source": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1067491/000106749126000018/exv99w06.htm",
+    "section": "Statement of Consolidated Audited Results",
+    "method": "Manually transcribed from the detailed consolidated statement"
+  },
+  "facts": [
+    {"metric": "revenue", "row": "Revenue from operations", "start": "2025-01-01", "end": "2025-03-31", "value": "40925"},
+    {"metric": "revenue", "row": "Revenue from operations", "start": "2026-01-01", "end": "2026-03-31", "value": "46402"},
+    {"metric": "owners-profit", "row": "Profit attributable to: Owners of the company", "start": "2025-01-01", "end": "2025-03-31", "value": "7033"},
+    {"metric": "owners-profit", "row": "Profit attributable to: Owners of the company", "start": "2026-01-01", "end": "2026-03-31", "value": "8501"}
+  ]
+}

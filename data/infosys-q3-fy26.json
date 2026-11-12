@@ -1,0 +1,17 @@
+{
+  "snapshot_id": "infosys-q3-fy26-v1",
+  "company": "Infosys",
+  "symbol": "INFY",
+  "scope": "consolidated",
+  "accounting_basis": "Ind AS",
+  "unit": "INR crore",
+  "source": {
+    "url": "https://www.infosys.com/investors/reports-filings/quarterly-results/2025-2026/q3/documents/q3-and-9m-fy26-financial-results-auditorsreports.pdf",
+    "section": "Statement of Consolidated Audited Results",
+    "method": "Manually transcribed from the quarter column of Infosys's audited statement"
+  },
+  "facts": [
+    {"metric": "revenue", "row": "Revenue from operations", "start": "2025-10-01", "end": "2025-12-31", "value": "45479"},
+    {"metric": "owners-profit", "row": "Profit attributable to: Owners of the company", "start": "2025-10-01", "end": "2025-12-31", "value": "6654"}
+  ]
+}
