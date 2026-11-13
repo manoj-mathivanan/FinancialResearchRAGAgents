@@ -38,3 +38,16 @@ class ResearchAPITests(unittest.TestCase):
         response = self.client.post("/api/ask", json={"question": "Revenue?", "period_end": "2023-03-31"})
         self.assertEqual(response.status_code, 422)
         self.assertEqual(self.calls, [])
+
+    def test_brief_compares_adjacent_quarters_with_citations(self):
+        response = self.client.get("/api/brief")
+        self.assertEqual(response.status_code, 200)
+        brief = response.json()
+        self.assertEqual([metric["percent_change"] for metric in brief["metrics"]], ["2.22", "-9.64"])
+        for metric in brief["metrics"]:
+            self.assertEqual(metric["prior"]["period_end"], "2025-09-30")
+            self.assertEqual(metric["current"]["period_end"], "2025-12-31")
+            self.assertTrue(metric["prior"]["source"]["url"].endswith("#page=86"))
+            self.assertTrue(metric["current"]["source"]["url"].endswith("#page=87"))
+        self.assertTrue(brief["management"]["url"].endswith("#page=21"))
+        self.assertEqual(self.calls, [])

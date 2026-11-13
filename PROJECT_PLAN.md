@@ -436,6 +436,8 @@ Sentiment deferral, provider-native rating granularity if revisited, no mandator
 
 Conversational follow-ups and chat history are deferred. If added, use a separate session for each visitor so follow-ups can refer to earlier turns in that session. Decide separately whether to retain conversations across visits. The shared research index contains source evidence.
 
+For a model-serving experiment, deploy GPT-OSS 20B from Hugging Face to a private Modal endpoint with vLLM and compare it against the Groq-hosted model. Then try Qwen 3.8 27B as a second model. Keep the research cases and evidence fixed, and compare schema adherence, citation accuracy, completeness, latency, and cost before changing the public app. [Modal serving example](https://modal.com/docs/examples/gpt_oss_inference) · [Qwen model card](https://huggingface.co/Qwen/Qwen3.8-27B)
+
 Investor sentiment, analyst consensus, stock-price prediction, original AI buy/sell recommendations, automated trading, personal portfolio advice, valuation/target-price models, broad-market screening, multiple sectors, live news/social sentiment, arbitrary uploads, audio transcription, intraday data, knowledge graphs, fine-tuning, Kubernetes, and autonomous agent spawning.
 
 Ongoing source updates come after the reproducible snapshot. Sentiment and rating displays are not part of this release.

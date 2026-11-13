@@ -1,0 +1,17 @@
+{
+  "snapshot_id": "infosys-q2-fy26-v1",
+  "company": "Infosys",
+  "symbol": "INFY",
+  "scope": "consolidated",
+  "accounting_basis": "Ind AS",
+  "unit": "INR crore",
+  "source": {
+    "url": "https://nsearchives.nseindia.com/corporate/Infosys_16102025160458_BM_Outcome_Oct162025.pdf#page=86",
+    "section": "Condensed Consolidated Statement of Comprehensive Income",
+    "method": "Manually transcribed from the three-month column"
+  },
+  "facts": [
+    {"metric": "revenue", "row": "Revenues", "start": "2025-07-01", "end": "2025-09-30", "value": "44490"},
+    {"metric": "owners-profit", "row": "Profit attributable to owners of the company", "start": "2025-07-01", "end": "2025-09-30", "value": "7364"}
+  ]
+}

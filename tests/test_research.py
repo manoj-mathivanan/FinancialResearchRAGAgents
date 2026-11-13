@@ -62,8 +62,8 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(result["percent_change"], "8.90")
         self.assertEqual(result["prior"]["value"], "41764")
         self.assertEqual(result["current"]["value"], "45479")
-        self.assertIn("/2024-2025/", result["prior"]["source"]["url"])
-        self.assertIn("/2025-2026/", result["current"]["source"]["url"])
+        self.assertTrue(result["prior"]["source"]["url"].endswith("January162025.pdf#page=80"))
+        self.assertTrue(result["current"]["source"]["url"].endswith("January142026.pdf#page=87"))
 
     def test_rejects_route_that_conflicts_with_explicit_period(self):
         result = self.run_route(

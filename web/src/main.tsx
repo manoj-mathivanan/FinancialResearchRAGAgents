@@ -19,6 +19,13 @@ type Citation =
   | { type?: undefined; source_url: string; pdf_page: number; transcript_page: number; period_end: string };
 
 type SearchStep = { query: string; pdf_pages: number[] };
+type Brief = {
+  metrics: { metric: string; prior: FilingInput; current: FilingInput; percent_change: string }[];
+  management: { text: string; url: string };
+  assessment: string;
+  assessment_basis: string;
+  gap: string;
+};
 type Answer = {
   status: "answered" | "partial" | "insufficient_evidence";
   claims: { text: string; source_ids: string[] }[];
@@ -56,6 +63,46 @@ function SourceLink({ url, label }: { url: string; label: string }) {
   return href
     ? <a className="source-link" href={href} target="_blank" rel="noopener noreferrer">{label} <ArrowUpRight size={14} /></a>
     : <span className="muted">Source link unavailable</span>;
+}
+
+function QuarterlyBrief() {
+  const [brief, setBrief] = useState<Brief>();
+  const [failed, setFailed] = useState(false);
+
+  async function load() {
+    if (brief) return;
+    setFailed(false);
+    try {
+      const response = await fetch("/api/brief");
+      if (!response.ok) throw new Error("Brief unavailable");
+      setBrief(await response.json());
+    } catch {
+      setFailed(true);
+    }
+  }
+
+  const crore = new Intl.NumberFormat("en-IN");
+  return <details className="answer-card quarterly-brief" onToggle={event => { if (event.currentTarget.open) void load(); }}>
+    <summary>Infosys quarterly brief · December 2025</summary>
+    {failed && <p role="alert">The brief is unavailable. Close and reopen it to retry.</p>}
+    {!brief && !failed && <p role="status">Loading the quarterly brief…</p>}
+    {brief && <>
+      <p><strong>Business outlook · {brief.assessment}</strong> {brief.assessment_basis}</p>
+      <div className="brief-metrics">
+        {brief.metrics.map(metric => <article key={metric.metric}>
+          <h3>{metric.metric === "revenue" ? "Revenue" : "Profit attributable to owners"}</h3>
+          <strong>{metric.percent_change}</strong>% quarter over quarter
+          <p>{formatQuarter(metric.prior.period_end)} · ₹{crore.format(Number(metric.prior.value))} crore<br />
+            {formatQuarter(metric.current.period_end)} · ₹{crore.format(Number(metric.current.value))} crore</p>
+          <SourceLink url={metric.prior.source.url} label="September filing" />{" · "}
+          <SourceLink url={metric.current.source.url} label="December filing" />
+        </article>)}
+      </div>
+      <h3>Management commentary</h3>
+      <p>{brief.management.text} <SourceLink url={brief.management.url} label="Earnings call, PDF page 21" /></p>
+      <p className="notice">{brief.gap}</p>
+    </>}
+  </details>;
 }
 
 function FilingRow({ fact }: { fact: FilingInput }) {
@@ -235,6 +282,7 @@ function App() {
               : <div className="empty-sources"><Search size={23} strokeWidth={1.5} /><p>{answer ? "This answer has no cited sources." : "Cited filings and transcript pages will appear here."}</p></div>}
           </aside>
         </div>
+        <QuarterlyBrief />
       </main>
     </>
   );

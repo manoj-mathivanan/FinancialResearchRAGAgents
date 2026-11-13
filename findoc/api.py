@@ -12,6 +12,7 @@ from openai import APIError
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 
+from findoc.brief import infosys_brief
 from findoc.models import DEFAULT_MODEL, GROQ_MODEL, KEY_ENV, Provider
 from findoc.research import PERIODS, ROOT, live_workflow
 from findoc.supervisor import live_supervisor
@@ -66,6 +67,10 @@ def create_app(answer=run_question) -> FastAPI:
     @app.get("/api/config")
     def config():
         return {"periods": PERIODS, "transcript_periods": sorted(TRANSCRIPTS)}
+
+    @app.get("/api/brief")
+    def brief():
+        return infosys_brief(ROOT / "data")
 
     @app.post("/api/ask")
     def ask(request: Question):

@@ -110,6 +110,11 @@ a.citation:hover { text-decoration: underline; }
 .spinner { width: 16px; height: 16px; border: 2px solid #d5e5da; border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
 .error { border-color: #e0bdb6; color: #71372a; }
 .error p { margin: 5px 0 0; }
+.quarterly-brief summary { cursor: pointer; font-weight: 700; }
+.quarterly-brief h3 { margin: 8px 0; font-size: 15px; }
+.brief-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+.brief-metrics article { padding: 12px; border: 1px solid var(--line); border-radius: 7px; }
+.brief-metrics p { margin: 6px 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }

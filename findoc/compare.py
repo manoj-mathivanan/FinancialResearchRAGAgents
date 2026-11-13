@@ -60,7 +60,11 @@ def reported_fact(snapshot: dict, metric: str, period_end: date) -> dict:
 
 def compare_yoy(snapshot: dict, metric: str, period_end: date) -> dict:
     quarter_start(period_end)
-    prior_fact = reported_fact(snapshot, metric, period_end.replace(year=period_end.year - 1))
+    return compare_quarters(snapshot, metric, period_end, period_end.replace(year=period_end.year - 1))
+
+
+def compare_quarters(snapshot: dict, metric: str, period_end: date, prior_end: date) -> dict:
+    prior_fact = reported_fact(snapshot, metric, prior_end)
     current_fact = reported_fact(snapshot, metric, period_end)
     prior, current = Decimal(prior_fact["value"]), Decimal(current_fact["value"])
     growth = percentage_change(current, prior)
