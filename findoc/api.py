@@ -12,7 +12,7 @@ from openai import APIError
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 
-from findoc.answer import DEFAULT_MODEL
+from findoc.models import DEFAULT_MODEL, GROQ_MODEL, KEY_ENV, Provider
 from findoc.research import PERIODS, ROOT, live_workflow
 from findoc.supervisor import live_supervisor
 from findoc.tools.transcripts import TRANSCRIPTS
@@ -42,17 +42,20 @@ class Question(BaseModel):
 
 
 @lru_cache(maxsize=4)
-def workflow_for(mode: str, model: str, dsn: str | None):
+def workflow_for(mode: str, model: str, dsn: str | None, provider: Provider):
     factory = live_supervisor if mode == "team" else live_workflow
-    return factory(model, dsn)
+    return factory(model, dsn, provider=provider)
 
 
 def run_question(request: Question) -> dict:
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(503, "The server needs an OpenAI API key before it can answer.")
-    workflow = workflow_for(
-        request.mode, os.getenv("FINDOC_ANSWER_MODEL", DEFAULT_MODEL), os.getenv("FINDOC_DATABASE_URL")
-    )
+    provider = os.getenv("FINDOC_MODEL_PROVIDER", "openai")
+    if provider not in ("openai", "groq"):
+        raise HTTPException(503, "The server needs a supported model provider.")
+    if not os.getenv(KEY_ENV[provider]):
+        raise HTTPException(503, f"The server needs {KEY_ENV[provider]} before it can answer.")
+    default_model = GROQ_MODEL if provider == "groq" else DEFAULT_MODEL
+    model = os.getenv("FINDOC_ANSWER_MODEL", default_model)
+    workflow = workflow_for(request.mode, model, os.getenv("FINDOC_DATABASE_URL"), provider)
     return workflow.invoke({"question": request.question, "period_hint": request.period_end})["result"]
 
 

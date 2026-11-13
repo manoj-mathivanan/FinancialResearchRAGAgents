@@ -1,0 +1,17 @@
+**
+!Dockerfile
+!requirements-*.txt
+!findoc/
+!findoc/**
+!data/
+!data/infosys-*.json
+!web/
+!web/index.html
+!web/package.json
+!web/package-lock.json
+!web/tsconfig.json
+!web/vite.config.ts
+!web/src/
+!web/src/**
+**/__pycache__
+**/*.pyc

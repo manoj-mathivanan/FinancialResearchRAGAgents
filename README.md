@@ -221,3 +221,23 @@ npm.cmd run build --prefix web
 Open [the local research workspace](http://127.0.0.1:8000). The server reads `OPENAI_API_KEY` and `FINDOC_DATABASE_URL` from the environment or the ignored project `.env`. Questions that need transcript evidence require a running, indexed pgvector database. Financial calculations can use the local snapshots with no database connection. Keep both settings server-side.
 
 For UI development, leave FastAPI running and run `npm.cmd run dev --prefix web` in a second terminal. Vite proxies API requests to the local FastAPI server. The production build can be served by FastAPI directly. Deploying that build to staging still requires a database with the corpus indexed and server-side credentials. [FastAPI static serving](https://fastapi.tiangolo.com/tutorial/static-files/), [Vite dev proxy](https://vite.dev/config/server-options#server-proxy)
+
+### Try Groq from the local UI
+
+Set `FINDOC_MODEL_PROVIDER=groq` and `GROQ_API_KEY` in the ignored `.env`, then restart FastAPI. The web app defaults to GPT-OSS 20B in Groq mode. If you previously set `FINDOC_ANSWER_MODEL`, clear the override or use a model ID available on Groq that supports strict structured outputs. Keep the indexed `FINDOC_DATABASE_URL` configured for transcript searches. [Groq API keys](https://console.groq.com/keys) · [Groq structured outputs](https://console.groq.com/docs/structured-outputs)
+
+Select **Research Team** and ask how Infosys revenue changed year over year in December 2025 and what management said about the labor-code impact on margins. FastAPI sends the model calls to Groq. LangGraph, the calculator, and the embedding search run through the local backend. Set `FINDOC_MODEL_PROVIDER=openai` to use the OpenAI baseline in the web app.
+
+### Run embedding inference through a hosted API
+
+Set `FINDOC_EMBEDDING_PROVIDER=openai` with `OPENAI_API_KEY` to use `text-embedding-3-small` for both indexing and search. Reindex the two transcripts under that configuration, then start FastAPI with the same setting. The hosted index has its own version, so searches use embeddings from the selected model. PostgreSQL still stores the vectors and computes similarity on the app's database server. The default local mode uses FastEmbed for the BGE retrieval baseline. [OpenAI embedding model](https://developers.openai.com/api/docs/models/text-embedding-3-small)
+
+### Shared PostgreSQL on the DigitalOcean VPS
+
+The VPS runs one PostgreSQL instance with separate Trader and FinDoc databases. FastAPI serves React, calls Groq for generation, and runs BGE embeddings locally through FastEmbed.
+
+FinDoc is reachable at [findoc.manojmathivanan.com](https://findoc.manojmathivanan.com). Cloudflare publishes a DNS-only record to the VPS. Caddy terminates HTTPS and proxies to FastAPI on loopback. The container uses the read-only database account and a persistent BGE model cache. The first hosted Research Team check reached the container's 280 MiB memory limit without restarting. Concurrent research capacity has not been measured.
+
+The [PostgreSQL Dockerfile](deploy/postgres/Dockerfile) adds pgvector to the exact Alpine image used by Trader. Download the [pgvector source archive](https://codeload.github.com/pgvector/pgvector/tar.gz/refs/tags/v0.8.7) as `pgvector.tar.gz` into a temporary build context alongside that Dockerfile. The build verifies the archive checksum before compiling. The compiled extension files are copied into the final image.
+
+Before cutover, preserve the running image and Compose configuration, verify a usable Trader backup, and choose a maintenance window outside scheduled Trader jobs. Swap only the PostgreSQL service image while retaining its existing data mount and settings. Verify PostgreSQL readiness, query Trader's database, and check Trader's application before creating a dedicated FinDoc database. Install pgvector there as an administrator, then index the transcripts with a dedicated indexing role and give the web role read access. If the swap fails, restore the saved image and Compose configuration with the same data mount. Check FastAPI and Trader memory together before publishing the FinDoc UI.

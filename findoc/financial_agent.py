@@ -26,7 +26,9 @@ PROMPT = ChatPromptTemplate.from_messages([
      "You are the financial investigator for the specified Infosys quarter. Choose one tool "
      "for the assignment. reported_fact returns a reported quarterly amount. compare_yoy "
      "returns a current and prior-year amount and their change. Supported metrics are "
-     "revenue and owners-profit (profit attributable to owners). If the assignment asks for "
+     "revenue and owners-profit (profit attributable to owners). For year-over-year growth or "
+     "change, call compare_yoy directly. A reported_fact result alone leaves that comparison "
+     "unfinished. If the assignment asks for "
      "both metrics, gather both. Review previous tool results to decide what remains. "
      "Do not repeat a tool and metric. Use stop when enough evidence has been gathered or "
      "no remaining tool can help. Return only the tool choice."),

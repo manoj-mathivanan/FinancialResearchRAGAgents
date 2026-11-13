@@ -434,6 +434,8 @@ Sentiment deferral, provider-native rating granularity if revisited, no mandator
 
 ### Deferred features
 
+Conversational follow-ups and chat history are deferred. If added, use a separate session for each visitor so follow-ups can refer to earlier turns in that session. Decide separately whether to retain conversations across visits. The shared research index contains source evidence.
+
 Investor sentiment, analyst consensus, stock-price prediction, original AI buy/sell recommendations, automated trading, personal portfolio advice, valuation/target-price models, broad-market screening, multiple sectors, live news/social sentiment, arbitrary uploads, audio transcription, intraday data, knowledge graphs, fine-tuning, Kubernetes, and autonomous agent spawning.
 
 Ongoing source updates come after the reproducible snapshot. Sentiment and rating displays are not part of this release.

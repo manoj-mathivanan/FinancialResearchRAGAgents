@@ -9,16 +9,16 @@ from typing import Literal, TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from openai import APIError
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import SQLAlchemyError
 
 from findoc.answer import DEFAULT_MODEL, Draft, answer_question, calculation_passage
+from findoc.models import Provider, chat_model
 from findoc.compare import MissingFactError, compare_yoy
 from findoc.tools.transcripts import TRANSCRIPTS
-from findoc.vector import LocalEmbeddings, open_store, search, vector_engine
+from findoc.vector import configured_embeddings, open_store, search, vector_engine
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -167,14 +167,13 @@ def calculate_from_snapshot(period: str, metric: str) -> dict:
     return compare_yoy(load_snapshot(period), metric, date.fromisoformat(period))
 
 
-def live_workflow(model_name: str, dsn: str | None):
+def live_workflow(model_name: str, dsn: str | None, *, provider: Provider = "openai"):
     def retrieve(question, period):
-        embeddings = LocalEmbeddings()
+        embeddings = configured_embeddings()
         with vector_engine(dsn) as engine:
             return search(open_store(engine, embeddings), embeddings, question, period, limit=5)
 
-    model = ChatOpenAI(model=model_name, timeout=30, max_retries=1, max_tokens=1000,
-                       use_responses_api=True, store=False)
+    model = chat_model(model_name, provider)
     return build_workflow(
         model.with_structured_output(Route, method="json_schema", strict=True),
         model.with_structured_output(Draft, method="json_schema", strict=True),

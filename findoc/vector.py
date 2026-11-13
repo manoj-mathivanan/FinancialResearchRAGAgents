@@ -3,18 +3,20 @@
 import argparse
 import asyncio
 from contextlib import contextmanager
-from functools import partial
+from functools import lru_cache, partial
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import subprocess
+from typing import ClassVar
 from uuid import NAMESPACE_URL, uuid5
 
 import psycopg
 from psycopg.types.json import Json
-from fastembed import TextEmbedding
+from dotenv import load_dotenv
 from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_postgres import Column, PGEngine, PGVectorStore
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
@@ -24,6 +26,7 @@ from findoc.tools import transcripts
 
 MODEL = "BAAI/bge-small-en-v1.5"
 INDEX_VERSION = MODEL + ":words140-overlap30:v1"
+DIMENSIONS = 384
 TABLE = "transcript_vectors"
 FILTER_COLUMNS = ("company", "period_end", "index_version")
 
@@ -47,14 +50,39 @@ def open_store(engine: PGEngine, model: Embeddings) -> PGVectorStore:
 class LocalEmbeddings(Embeddings):
     """Expose the existing FastEmbed model through LangChain's interface."""
 
+    index_version = INDEX_VERSION
+
     def __init__(self):
-        self.model = TextEmbedding(MODEL)
+        from fastembed import TextEmbedding
+
+        self.model = TextEmbedding(MODEL, threads=1)
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         return [vector.tolist() for vector in self.model.passage_embed(texts)]
 
     def embed_query(self, text: str) -> list[float]:
         return next(self.model.query_embed(text)).tolist()
+
+
+class HostedEmbeddings(OpenAIEmbeddings):
+    index_version: ClassVar[str] = "openai:text-embedding-3-small:384:words140-overlap30:v1"
+
+
+@lru_cache(maxsize=1)
+def local_embeddings() -> LocalEmbeddings:
+    return LocalEmbeddings()
+
+
+def configured_embeddings() -> LocalEmbeddings | HostedEmbeddings:
+    provider = os.getenv("FINDOC_EMBEDDING_PROVIDER", "local")
+    if provider == "local":
+        return local_embeddings()
+    if provider == "openai":
+        return HostedEmbeddings(
+            model="text-embedding-3-small", dimensions=DIMENSIONS, request_timeout=15,
+            max_retries=1, check_embedding_ctx_length=False,
+        )
+    raise ValueError("Set FINDOC_EMBEDDING_PROVIDER to local or openai.")
 
 
 def passages(text: str):
@@ -65,7 +93,7 @@ def passages(text: str):
             break
 
 
-def index_pdf(connection, pdf: Path, model: LocalEmbeddings) -> tuple[str, int]:
+def index_pdf(connection, pdf: Path, model: LocalEmbeddings | HostedEmbeddings) -> tuple[str, int]:
     period, pages = transcripts.read_call_pages(pdf)
     digest = sha256(pdf.read_bytes()).hexdigest()
     chunks = [
@@ -79,7 +107,7 @@ def index_pdf(connection, pdf: Path, model: LocalEmbeddings) -> tuple[str, int]:
         # The library's bulk writer commits each row. Replace the quarter atomically.
         connection.execute(
             f"DELETE FROM {TABLE} WHERE company = %s AND period_end = %s AND index_version = %s",
-            ("INFY", period, INDEX_VERSION),
+            ("INFY", period, model.index_version),
         )
         with connection.cursor() as cursor:
             cursor.executemany(f"""
@@ -88,8 +116,8 @@ def index_pdf(connection, pdf: Path, model: LocalEmbeddings) -> tuple[str, int]:
                 ) VALUES (%s, %s, %s, %s, %s, %s::vector, %s)
             """, [
                 (
-                    uuid5(NAMESPACE_URL, f"INFY:{period}:{INDEX_VERSION}:{page}:{ordinal}"),
-                    "INFY", period, INDEX_VERSION, passage,
+                    uuid5(NAMESPACE_URL, f"INFY:{period}:{model.index_version}:{page}:{ordinal}"),
+                    "INFY", period, model.index_version, passage,
                     json.dumps(embedding, allow_nan=False),
                     Json({
                         "pdf_page": page,
@@ -104,13 +132,13 @@ def index_pdf(connection, pdf: Path, model: LocalEmbeddings) -> tuple[str, int]:
     return period, len(chunks)
 
 
-def search(store: PGVectorStore, model: LocalEmbeddings, question: str, period: str, limit: int = 3):
+def search(store: PGVectorStore, model: LocalEmbeddings | HostedEmbeddings, question: str, period: str, limit: int = 3):
     if not question.strip():
         raise ValueError("Enter a question.")
     if limit < 1:
         raise ValueError("Search limit must be positive.")
     query_vector = model.embed_query(question)
-    filters = {"company": "INFY", "period_end": period, "index_version": INDEX_VERSION}
+    filters = {"company": "INFY", "period_end": period, "index_version": model.index_version}
     candidates = limit
     while True:
         matches = store.similarity_search_with_score_by_vector(query_vector, k=candidates, filter=filters)
@@ -131,6 +159,7 @@ def search(store: PGVectorStore, model: LocalEmbeddings, question: str, period: 
 
 
 def main() -> None:
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     index = commands.add_parser("index", help="Index one or more local transcripts.")
@@ -146,12 +175,12 @@ def main() -> None:
     if not dsn:
         parser.error("Set FINDOC_DATABASE_URL to a PostgreSQL connection string.")
     try:
-        model = LocalEmbeddings()
+        model = configured_embeddings()
         with vector_engine(dsn) as engine:
             if args.command == "index":
                 try:
                     engine.init_vectorstore_table(
-                        TABLE, 384, metadata_columns=[Column(name, "TEXT", nullable=False) for name in FILTER_COLUMNS]
+                        TABLE, DIMENSIONS, metadata_columns=[Column(name, "TEXT", nullable=False) for name in FILTER_COLUMNS]
                     )
                 except ProgrammingError as exc:
                     if not isinstance(exc.orig, psycopg.errors.DuplicateTable):

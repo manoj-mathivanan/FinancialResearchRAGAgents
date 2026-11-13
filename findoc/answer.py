@@ -17,11 +17,9 @@ import psycopg
 from sqlalchemy.exc import SQLAlchemyError
 
 from findoc.compare import METRICS, MissingFactError, compare_yoy
+from findoc.models import DEFAULT_MODEL
 from findoc.tools.transcripts import TRANSCRIPTS
-from findoc.vector import LocalEmbeddings, open_store, search, vector_engine
-
-
-DEFAULT_MODEL = "gpt-5.6-terra"
+from findoc.vector import configured_embeddings, open_store, search, vector_engine
 
 
 class Claim(BaseModel):
@@ -137,7 +135,7 @@ def main() -> None:
             snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
             result = answer_calculation(args.question, args.period_end, snapshot, args.metric, generator)
         else:
-            embeddings = LocalEmbeddings()
+            embeddings = configured_embeddings()
             with vector_engine(dsn) as engine:
                 passages = search(open_store(engine, embeddings), embeddings, args.question, period)
             result = answer_question(args.question, period, passages, generator)

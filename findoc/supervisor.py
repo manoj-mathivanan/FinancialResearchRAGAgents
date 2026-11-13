@@ -7,7 +7,6 @@ from typing import TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from openai import APIError
 from pydantic import BaseModel, ConfigDict
@@ -16,9 +15,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from findoc.answer import DEFAULT_MODEL, Draft, answer_question
 from findoc.financial_agent import FinancialAction, investigate_financials
 from findoc.investigate import FollowUp, build_investigation
+from findoc.models import Provider, chat_model
 from findoc.research import PERIODS, ROOT, load_snapshot
 from findoc.tools.transcripts import TRANSCRIPTS
-from findoc.vector import LocalEmbeddings, open_store, search, vector_engine
+from findoc.vector import configured_embeddings, open_store, search, vector_engine
 
 
 class Assignment(BaseModel):
@@ -116,9 +116,8 @@ def build_supervisor(supervisor, financial, management, generator):
     return graph.compile()
 
 
-def live_supervisor(model_name: str, dsn: str | None):
-    model = ChatOpenAI(model=model_name, timeout=30, max_retries=1, max_tokens=1000,
-                       use_responses_api=True, store=False)
+def live_supervisor(model_name: str, dsn: str | None, *, provider: Provider = "openai"):
+    model = chat_model(model_name, provider)
 
     def structured(schema):
         return model.with_structured_output(schema, method="json_schema", strict=True)
@@ -134,11 +133,11 @@ def live_supervisor(model_name: str, dsn: str | None):
             return {"gaps": [f"No transcript is configured for {period}."]}
         if not dsn:
             return {"gaps": ["Transcript search needs a connection to the vector database."]}
-        embeddings = LocalEmbeddings()
+        embeddings = configured_embeddings()
         with vector_engine(dsn) as engine:
             store = open_store(engine, embeddings)
             graph = build_investigation(
-                management_planner, None, lambda query, period: search(store, embeddings, query, period, limit=2)
+                management_planner, None, lambda query, period: search(store, embeddings, query, period, limit=5)
             )
             findings = graph.invoke({"question": task, "period_end": period})
         passages = findings["passages"]
