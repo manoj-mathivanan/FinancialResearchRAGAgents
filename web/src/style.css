@@ -132,6 +132,9 @@ a.citation:hover { text-decoration: underline; }
 .architecture-provider svg { flex: none; }
 .architecture-provider p { margin: 0; }
 .architecture-baseline { margin-bottom: 0; font-size: 14px; }
+.architecture-search { border-top: 1px solid var(--line); padding-top: 12px; }
+.architecture-search summary { cursor: pointer; font-weight: 700; }
+.architecture-search p { color: var(--muted); font-size: 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
@@ -142,4 +145,9 @@ a.citation:hover { text-decoration: underline; }
   .ask-card, .answer-card { padding: 15px; }
   .example-list { grid-template-columns: 1fr; }
   .composer-footer > span { max-width: 145px; }
+}
+@media (max-width: 360px) {
+  .topbar-inner { gap: 8px; }
+  .top-context { gap: 5px; white-space: nowrap; }
+  .brand { font-size: 16px; }
 }
