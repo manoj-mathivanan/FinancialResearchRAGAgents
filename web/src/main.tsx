@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { Architecture } from "./Architecture";
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, Calculator, FileText,
   Layers3, Search, Workflow,
@@ -214,6 +215,7 @@ function App() {
         <section className="intro">
           <h1>Company research</h1>
           <p>Ask about Infosys and trace the answer back to a filing or earnings call.</p>
+          <a className="source-link architecture-link" href="#architecture">How FinDoc works <ArrowDownRight size={14} /></a>
         </section>
         <div className="layout">
           <section className="workspace" aria-label="Question and answer">
@@ -283,6 +285,7 @@ function App() {
           </aside>
         </div>
         <QuarterlyBrief />
+        <Architecture />
       </main>
     </>
   );
