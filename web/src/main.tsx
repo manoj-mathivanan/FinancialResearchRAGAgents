@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { Architecture } from "./Architecture";
+import { ResearchMode } from "./ResearchMode";
+import type { Mode } from "./ResearchMode";
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, Calculator, FileText,
   Layers3, Search, Workflow,
@@ -156,7 +158,8 @@ function WorkflowDetails({ answer }: { answer: Answer }) {
 function App() {
   const [periods, setPeriods] = useState<string[]>([]);
   const [period, setPeriod] = useState("");
-  const [mode, setMode] = useState<"quick" | "team">("team");
+  const [mode, setMode] = useState<Mode>("team");
+  const [symbol, setSymbol] = useState("INFY");
   const [question, setQuestion] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [answer, setAnswer] = useState<Answer>();
@@ -183,7 +186,7 @@ function App() {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, period_end: period || null, mode }),
+        body: JSON.stringify({ question: text, symbol, period_end: period || null, mode }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
@@ -208,26 +211,32 @@ function App() {
             <span className="brand-mark"><Layers3 size={21} strokeWidth={2.1} /></span>
             FinDoc <span>Research</span>
           </a>
-          <span className="top-context"><span className="status-dot" /> Infosys <span className="context-divider">/</span> NSE</span>
+          <span className="top-context">NSE</span>
         </div>
       </header>
       <main className="shell">
         <section className="intro">
           <h1>Company research</h1>
-          <p>Ask about Infosys and trace the answer back to a filing or earnings call.</p>
+          <p>Ask about company performance and trace answers back to filings and earnings calls.</p>
           <a className="source-link architecture-link" href="#architecture">How FinDoc works <ArrowDownRight size={14} /></a>
         </section>
         <div className="layout">
           <section className="workspace" aria-label="Question and answer">
+            <section className="examples" aria-labelledby="examples-heading">
+              <h2 id="examples-heading">Try a question</h2>
+              <div className="example-list">{examples.map(({ icon: Icon, label, question: sample }) => (
+                <button className="example" key={label} type="button" disabled={busy} onClick={() => {
+                  setQuestion(sample); setPeriod(""); document.getElementById("question")?.focus();
+                }}><Icon size={17} /><span>{label}</span><ArrowDownRight className="example-arrow" size={15} /></button>
+              ))}</div>
+            </section>
             <form className="ask-card" onSubmit={ask}>
               <div className="controls">
-                <fieldset disabled={busy}>
-                  <legend>Research mode</legend>
-                  <div className="segments">
-                    <label><input type="radio" name="mode" checked={mode === "quick"} onChange={() => setMode("quick")} /> <span>Quick research</span></label>
-                    <label><input type="radio" name="mode" checked={mode === "team"} onChange={() => setMode("team")} /> <span><Workflow size={15} /> Research team</span></label>
-                  </div>
-                </fieldset>
+                <label className="period-control">Stock
+                  <select value={symbol} onChange={event => setSymbol(event.target.value)} disabled={busy}>
+                    <option value="INFY">Infosys (INFY)</option>
+                  </select>
+                </label>
                 <label className="period-control">Reporting quarter
                   <select value={period} onChange={event => setPeriod(event.target.value)} disabled={busy}>
                     <option value="">Infer from question</option>
@@ -235,26 +244,18 @@ function App() {
                   </select>
                 </label>
               </div>
+              <div className="question-mode"><ResearchMode name="mode" label="Research mode" mode={mode} onChange={setMode} disabled={busy} /></div>
               <label className="question-label" htmlFor="question">Research question</label>
               <div className="composer">
                 <textarea id="question" value={question} onChange={event => setQuestion(event.target.value)}
                   placeholder="How did Infosys revenue change in the December 2025 quarter?" rows={3} maxLength={1200} disabled={busy} required />
                 <div className="composer-footer">
-                  <span>{mode === "team" ? "Delegates to specialists when needed" : "Routes directly to research tools"}</span>
                   <button className="ask-button" type="submit" disabled={busy || !question.trim()}>
                     {busy ? "Researching…" : "Ask FinDoc"} <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
             </form>
-            {!submitted && <div className="examples">
-              <h2>Try a question</h2>
-              <div className="example-list">{examples.map(({ icon: Icon, label, question: sample }) => (
-                <button className="example" key={label} type="button" onClick={() => {
-                  setQuestion(sample); setPeriod(""); document.getElementById("question")?.focus();
-                }}><Icon size={17} /><span>{label}</span><ArrowDownRight className="example-arrow" size={15} /></button>
-              ))}</div>
-            </div>}
             <div aria-live="polite" aria-busy={busy}>
               {busy && <section className="answer-card loading"><span className="spinner" /> Finding evidence and drafting an answer…</section>}
               {error && <section className="answer-card error" role="alert"><h2>Couldn’t complete the research</h2><p>{error}</p></section>}

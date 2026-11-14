@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class Question(BaseModel):
     question: str = Field(min_length=1, max_length=1200)
+    symbol: Literal["INFY"] = "INFY"
     period_end: str | None = None
     mode: Literal["quick", "team"] = "team"
 

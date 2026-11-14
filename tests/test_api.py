@@ -31,11 +31,17 @@ class ResearchAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.calls[0].question, "How did revenue change?")
         self.assertEqual(self.calls[0].mode, "team")
+        self.assertEqual(self.calls[0].symbol, "INFY")
         self.assertIn("S1", response.json()["sources"])
         self.assertEqual(response.json()["status"], "partial")
 
     def test_rejects_unknown_quarter_before_running_workflow(self):
         response = self.client.post("/api/ask", json={"question": "Revenue?", "period_end": "2023-03-31"})
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(self.calls, [])
+
+    def test_rejects_unknown_stock_before_running_workflow(self):
+        response = self.client.post("/api/ask", json={"question": "Revenue?", "symbol": "OTHER"})
         self.assertEqual(response.status_code, 422)
         self.assertEqual(self.calls, [])
 
