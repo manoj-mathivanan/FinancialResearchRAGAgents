@@ -25,6 +25,7 @@ from findoc.tools import transcripts
 
 
 MODEL = "BAAI/bge-small-en-v1.5"
+# Match the query to rows from the same model and passage format.
 INDEX_VERSION = MODEL + ":words140-overlap30:v1"
 DIMENSIONS = 384
 TABLE = "transcript_vectors"
@@ -70,6 +71,7 @@ class HostedEmbeddings(OpenAIEmbeddings):
 
 @lru_cache(maxsize=1)
 def local_embeddings() -> LocalEmbeddings:
+    # FastEmbed loads the model once per process, then reuses it for future searches.
     return LocalEmbeddings()
 
 
@@ -86,6 +88,7 @@ def configured_embeddings() -> LocalEmbeddings | HostedEmbeddings:
 
 
 def passages(text: str):
+    """Split a single page into 140-word windows with a 30-word overlap."""
     words = text.split()
     for start in range(0, len(words), 110):
         yield " ".join(words[start:start + 140])
@@ -102,6 +105,7 @@ def index_pdf(connection, pdf: Path, model: LocalEmbeddings | HostedEmbeddings) 
         for ordinal, passage in enumerate(passages(text), 1)
     ]
     embeddings = model.embed_documents([chunk[2] for chunk in chunks])
+    # Embedding inference finishes before any old database rows are replaced.
     transcript = transcripts.TRANSCRIPTS[period]
     with connection.transaction():
         # The library's bulk writer commits each row. Replace the quarter atomically.
@@ -138,6 +142,7 @@ def search(store: PGVectorStore, model: LocalEmbeddings | HostedEmbeddings, ques
     if limit < 1:
         raise ValueError("Search limit must be positive.")
     query_vector = model.embed_query(question)
+    # Only the query vector is built here. Document vectors are already stored.
     filters = {"company": "INFY", "period_end": period, "index_version": model.index_version}
     candidates = limit
     while True:

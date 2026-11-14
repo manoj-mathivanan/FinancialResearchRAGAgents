@@ -12,7 +12,6 @@ from openai import APIError
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import SQLAlchemyError
 
-from findoc.brief import infosys_brief
 from findoc.models import DEFAULT_MODEL, GROQ_MODEL, KEY_ENV, Provider
 from findoc.research import PERIODS, ROOT, live_workflow
 from findoc.supervisor import live_supervisor
@@ -23,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class ConversationTurn(BaseModel):
+    """One earlier turn supplied by this browser as reference context."""
+
     question: str = Field(min_length=1, max_length=1200)
     answer: str = Field(min_length=1, max_length=1200)
     period_end: Literal["2024-12-31", "2025-03-31", "2025-12-31", "2026-03-31"] | None = None
@@ -52,6 +53,7 @@ class Question(BaseModel):
 
 @lru_cache(maxsize=4)
 def workflow_for(mode: str, model: str, dsn: str | None, provider: Provider):
+    # Reuse the compiled graph and model clients. Each invocation gets its own state.
     factory = live_supervisor if mode == "team" else live_workflow
     return factory(model, dsn, provider=provider)
 
@@ -66,6 +68,7 @@ def run_question(request: Question) -> dict:
     model = os.getenv("FINDOC_ANSWER_MODEL", default_model)
     workflow = workflow_for(request.mode, model, os.getenv("FINDOC_DATABASE_URL"), provider)
     return workflow.invoke({
+    # The browser supplies history on every request. There is no server-side chat store.
         "question": request.question,
         "period_hint": request.period_end,
         "history": [turn.model_dump() for turn in request.history],
@@ -80,10 +83,6 @@ def create_app(answer=run_question) -> FastAPI:
     def config():
         return {"periods": PERIODS, "transcript_periods": sorted(TRANSCRIPTS)}
 
-    @app.get("/api/brief")
-    def brief():
-        return infosys_brief(ROOT / "data")
-
     @app.post("/api/ask")
     def ask(request: Question):
         try:
@@ -93,6 +92,7 @@ def create_app(answer=run_question) -> FastAPI:
             raise HTTPException(502, "Research is unavailable right now. Please try again.") from exc
 
     dist = ROOT / "web" / "dist"
+    # Register API routes first so the static mount only handles other paths.
     if (dist / "index.html").is_file():
         app.mount("/", StaticFiles(directory=dist, html=True), name="web")
     return app

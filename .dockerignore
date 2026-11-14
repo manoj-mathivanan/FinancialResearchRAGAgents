@@ -11,6 +11,8 @@
 !web/package-lock.json
 !web/tsconfig.json
 !web/vite.config.ts
+!web/public/
+!web/public/favicon.ico
 !web/src/
 !web/src/**
 **/__pycache__

@@ -8,7 +8,7 @@ export function Architecture() {
   const team = mode === "team";
 
   return (
-    <section className="answer-card architecture" id="architecture" aria-labelledby="architecture-title">
+    <section className="architecture" id="architecture" aria-labelledby="architecture-title">
       <h2 id="architecture-title">How FinDoc works</h2>
       <p className="architecture-intro">
         React sends your question to the DigitalOcean VPS. Caddy handles HTTPS, FastAPI validates the request, and LangGraph runs the selected workflow.
@@ -60,7 +60,7 @@ export function Architecture() {
           <div><dt>Embed and store</dt><dd>FastEmbed runs BGE Small English to produce a 384-number vector per passage. PostgreSQL 17 with pgvector runs on the DigitalOcean VPS and stores each vector alongside the text, quarter, and PDF link.</dd></div>
           <div><dt>Retrieve and cite</dt><dd>FastEmbed embeds the search query with the same model. pgvector ranks passages by similarity within the selected quarter. FinDoc sends their readable text to Groq and uses the saved page links for citations.</dd></div>
         </dl>
-        <p className="architecture-baseline">Financial calculations read reviewed filing snapshots directly. The quarterly brief uses those snapshots and Python calculations without an LLM call.</p>
+        <p className="architecture-baseline">Financial calculations read reviewed filing snapshots directly. The calculator uses Python for arithmetic. An LLM can choose the tool and explain its result.</p>
       </div>
     </section>
   );

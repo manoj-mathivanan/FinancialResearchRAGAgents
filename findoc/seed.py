@@ -15,6 +15,7 @@ def main() -> None:
         raise SystemExit("Set FINDOC_DATABASE_URL before indexing transcripts.")
 
     with TemporaryDirectory() as directory:
+        # The PDF downloads are temporary. The indexed passages live in PostgreSQL.
         pdfs = []
         for transcript in TRANSCRIPTS.values():
             request = Request(NSE_ARCHIVE + transcript.filename, headers={"User-Agent": "Mozilla/5.0"})

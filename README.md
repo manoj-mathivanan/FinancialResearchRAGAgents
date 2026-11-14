@@ -8,6 +8,103 @@ python -m findoc.compare data/infosys-q4-fy26.json owners-profit 2026-03-31
 python -m unittest discover -s tests -v
 ```
 
+## Read the code in this order
+
+The live demo covers Infosys (INFY). The UI offers four quarter ends for financial questions, and transcript search covers December 2024 and December 2025. The September 2025 snapshot is retained as source data for a future comparison. The chat currently does not select it.
+
+```mermaid
+flowchart LR
+    React["React chat"] --> API["FastAPI · POST /api/ask"]
+    API --> Quick["Quick research · LLM router"]
+    API --> Team["Research Team · LLM supervisor"]
+    Quick -->|one selection| Tools["Python calculator / vector search"]
+    Team --> Finance["Financial investigator · LLM"]
+    Team --> Call["Management investigator · LLM"]
+    Finance --> Tools
+    Call --> Tools
+    Tools -->|filing facts and transcript text| Answer["LLM answer · Python citation checks"]
+    Answer -->|claims, citations and gaps| React
+```
+
+### 1. Start at the browser and follow the request
+
+| File | Read this to understand |
+| --- | --- |
+| [web/index.html](web/index.html) | The page shell, browser tab icon, and JavaScript entry point. Vite copies the icon from [web/public](web/public) into the production build. |
+| [web/src/main.tsx](web/src/main.tsx) | How React mounts the page and places chat alongside the architecture section. |
+| [web/src/ResearchChat.tsx](web/src/ResearchChat.tsx) | Where stock, quarter, mode, question, turn history, and selected evidence live. Read the form handler to see where the browser serializes the request. Example buttons fill the composer so you can edit the question before submitting. |
+| [web/src/ResearchMode.tsx](web/src/ResearchMode.tsx) and [web/src/Architecture.tsx](web/src/Architecture.tsx) | How the mode control is shared with the architecture diagram. The diagram's control changes the diagram locally. |
+| [web/src/researchTypes.ts](web/src/researchTypes.ts) | The response fields read by the browser, including the three shapes of evidence. FastAPI validates the request with its own Pydantic classes. |
+| [web/src/ResearchAnswer.tsx](web/src/ResearchAnswer.tsx) and [web/src/EvidencePanel.tsx](web/src/EvidencePanel.tsx) | How claims, gaps, and the workflow trace render. Each answer starts its labels at S1, so the citation target includes the turn number. The source panel displays browser links from the selected answer. |
+| [findoc/api.py](findoc/api.py) | The GET /api/config and POST /api/ask routes. Read Question, then run_question. The latter selects the model and workflow and returns that invocation's result. The same server serves the compiled React build. |
+
+The request below asks a follow-up. A blank reporting-quarter dropdown sends null so the workflow can infer the quarter. Choosing a quarter supplies a hint that the backend enforces before running tools.
+
+```json
+{
+  "symbol": "INFY",
+  "period_end": null,
+  "mode": "team",
+  "question": "What about profit for the same quarter?",
+  "history": [{
+    "question": "How did revenue change year over year in December 2025?",
+    "answer": "Revenue grew 8.90% year over year.",
+    "period_end": "2025-12-31"
+  }]
+}
+```
+
+The response contains status, claims with source_ids, the sources keyed by ID, and any known gaps. Read route in Quick research or assignment, financial_tools, and transcript_searches in Research Team to see which paths executed.
+
+### 2. Follow the agents, model calls, and tools
+
+| Stage | Code and inputs | Output and execution |
+| --- | --- | --- |
+| Quick research | [research.py](findoc/research.py) sends the question, known quarters, explicit quarter hint, and history to an LLM. | A Route with a quarter, optional year-over-year metric, and optional transcript query. LangGraph runs the requested tools once. |
+| Research Team supervisor | [supervisor.py](findoc/supervisor.py) sends the same categories of input to the supervisor prompt. | An Assignment with a quarter and up to two specialist tasks. Python checks the period, and LangGraph starts the selected branches. Both branches feed one answer step. |
+| Financial investigator | [financial_agent.py](findoc/financial_agent.py) gives the LLM its assigned task, quarter, and the results of tools it already called. | At most three planning iterations. Python runs the selected reported_fact or compare_yoy tool, stops on a repeated action, and records evidence or a gap. The model can also stop explicitly. |
+| Management investigator | [investigate.py](findoc/investigate.py) runs an initial vector search. Its follow-up prompt includes the assignment, previous searches, and returned passages. | The LLM can ask for up to two distinct follow-up searches in the same transcript. Python enforces the limit and deduplicates passages. The specialist covers management commentary. |
+| Answer | [answer.py](findoc/answer.py) sends the question, quarter, bounded history, labeled current evidence, and known gaps to the LLM. | The LLM returns structured claims and source IDs. Python maps IDs to real filing rows or PDF pages, rejects unknown labels, and skips generation if there is no evidence. The citation check verifies the link between an ID and a retrieved source. Human inspection can check whether a passage supports the wording of the claim. |
+| Model provider | [models.py](findoc/models.py) builds the chat client. | The public app uses Groq's GPT-OSS 20B for all the language roles. Each role has a separate prompt and Pydantic output schema. The web app also supports an OpenAI provider. The client uses a 30-second timeout and one retry. |
+
+A Pydantic model such as Assignment is a **schema** that describes the response fields. GPT-OSS is the **language model** that decides what values go in those fields. LangGraph runs nodes and edges, which in turn call either an LLM or a Python tool. A tool is a bounded operation with arguments and a result. The calculator uses Decimal arithmetic. Vector search uses an embedding model plus database similarity search. The browser renders the returned JSON.
+
+### 3. Follow the two data paths
+
+**Filings and calculations.** Read [ingest.py](findoc/ingest.py), [the snapshots](data), and [compare.py](findoc/compare.py). The ingestion command uses Python's HTML parser to find the expected table, match dates and units, and compare extracted facts with reviewed references. Snapshots store rupee amounts in crore with filing URLs, rows, and dates. A date window distinguishes a three-month quarter from an annual or year-to-date statement ending on the same date. The financial tool loads the configured snapshots, locates the current and prior-year values, and computes (current − prior) / prior × 100. The calculation citation preserves both input rows. This path uses the JSON files and Python, without vector retrieval.
+
+**Transcripts and RAG.** RAG means retrieval-augmented generation. Here the application looks up passages before asking the language model to answer. [tools/transcripts.py](findoc/tools/transcripts.py) is shared by the keyword and vector indexers. It uses Poppler to extract the PDF, checks the expected call title and layout, strips boilerplate, and preserves physical PDF pages and printed transcript page numbers. [seed.py](findoc/seed.py) downloads the two configured NSE PDFs into a temporary directory and invokes the vector indexing command.
+
+1. [vector.py](findoc/vector.py) splits each page into windows of up to 140 words with 30 words of overlap. Keeping passages inside a page makes each PDF link precise.
+2. FastEmbed runs BAAI/bge-small-en-v1.5 on the VPS CPU. The embedding library handles tokenization internally. Token IDs represent text pieces while the model is processing them. The model produces one vector of 384 numbers for the whole passage. PostgreSQL stores that vector alongside the readable passage and provenance.
+3. LangChain Postgres sets up and queries transcript_vectors. Indexing uses a PostgreSQL transaction to replace the rows for one quarter and embedding version. Each row has the company, quarter, index version, original content, vector, PDF page, passage number, printed transcript page, source URL, and source file hash.
+4. On a question, Python embeds the transcript query with the matching model. PostgreSQL uses pgvector to rank passages by cosine distance, filtered by company, quarter, and index version. The code keeps the best passage per page and can widen the candidate set to return up to five distinct pages per live search.
+5. The answer prompt receives readable passage text labeled S1, S2, and so on. PostgreSQL provides the matched text, and Python keeps the original link for each label. Document embeddings are computed at indexing time. Only the query needs a new embedding during search.
+
+Read [baseline/keyword.py](findoc/baseline/keyword.py) for the SQLite FTS5 and BM25 path. [evidence.py](findoc/evidence.py) exposes its original CLI. [baseline/evaluate.py](findoc/baseline/evaluate.py) compares page retrieval with the [retrieval smoke cases](data/retrieval-smoke.json). [baseline/research_eval.py](findoc/baseline/research_eval.py) exercises routed answers with the [research smoke cases](data/research-smoke.json). The live transcript path uses vector search. Comparing keyword and vector search here is a separate exercise.
+
+### 4. See where context lives
+
+| Context | Lifetime and contents |
+| --- | --- |
+| Browser chat | React keeps the full visible thread for the open page. A request sends the last three turns with claims, each with its question, answer summary of up to 1,200 characters, and resolved quarter. Reload or New chat clears it. Separate visitors have separate in-page state. |
+| LangGraph state | One invocation holds the question, context supplied by the browser, route or assignments, tool results, and answer. FastAPI caches the compiled workflow for reuse, but each invocation starts with fresh state. |
+| Retrieval index | Persistent PostgreSQL rows derived from the published PDFs. Every visitor searches the same company corpus. User chat does not build or update the index. |
+| LLM prompt | Each role sees the inputs in its prompt template. Routing and synthesis use earlier turns to resolve references such as “the same quarter.” Specialists use their current assignment and tool observations. Fresh evidence from the current run supports the answer. |
+
+### 5. Map the code to the running site
+
+[Dockerfile](Dockerfile) builds the React bundle and packages it with the Python application. Caddy on the DigitalOcean VPS terminates HTTPS and proxies to FastAPI. FastAPI calls Groq for generation. BGE runs in the FastAPI process and reuses a cache mounted on the VPS. A read-only application role searches the FinDoc database in the shared PostgreSQL instance. The filing JSON ships with the app. Use [the deployment runbook](deploy/README.md) to trace the container, runtime configuration, check commands, and rollback.
+
+### Next steps for learning
+
+1. **Trace a request in the browser.** Open DevTools → Network, choose Quick research, and ask the December 2025 revenue-growth question. Read the POST JSON, then match the returned route, calculation, claims, and source IDs to the UI.
+2. **Run each tool in isolation.** Run compare.py against the March snapshot. Use the Step 4 vector search for the labor-code question and open the cited PDF page. Look at the query, distance, returned text, and source fields in the terminal output.
+3. **Watch the supervisor delegate.** Use Research Team and ask the combined question from **Try a question**. Open **How this answer was researched** and match the assignments, tool names, and PDF pages to the backend graph nodes.
+4. **Trace conversational context.** Ask “What about profit for the same quarter?” with the quarter set to **Infer from chat**. Inspect the next request's history alongside the fresh filing citation, then use **New chat** and repeat to see how missing context changes the route.
+5. **Make the workflow inspectable.** Add development-only timing for routing, each specialist, retrieval, and synthesis. Use the trace to explain which operations run on the VPS and which wait for Groq. After that, a second company is a good exercise in configuring stock and quarter metadata end to end.
+
+
 ## Step 1. Trace a number back to the filing
 
 1. Open the detailed consolidated audited statement and find the **Revenue from operations** row. Match the March 2026 and March 2025 **quarter** columns. The year column can have the same end date, so record both dates. [Infosys filing on EDGAR](https://www.sec.gov/Archives/edgar/data/1067491/000106749126000018/exv99w06.htm)

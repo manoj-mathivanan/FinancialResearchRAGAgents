@@ -13,6 +13,7 @@ KEY_ENV = {"openai": "OPENAI_API_KEY", "groq": "GROQ_API_KEY"}
 
 
 def chat_model(model_name: str, provider: Provider = "openai") -> ChatOpenAI:
+    """Use one client interface with each provider’s endpoint and API format."""
     options = {"model": model_name, "timeout": 30, "max_retries": 1, "max_tokens": 1000}
     if provider == "groq":
         return ChatOpenAI(

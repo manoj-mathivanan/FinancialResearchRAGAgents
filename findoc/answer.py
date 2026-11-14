@@ -58,10 +58,12 @@ def answer_question(question: str, period: str, passages: list[dict], generator,
     if not question.strip():
         raise ValueError("Enter a question.")
     sources = {f"S{index}": passage for index, passage in enumerate(passages, 1)}
+    # Source IDs are local to this answer. Keep original provenance beside each passage.
     if not sources:
         return {"status": "insufficient_evidence", "claims": [], "sources": {}}
 
     context = [{"id": label, "text": passage["body"]} for label, passage in sources.items()]
+    # The model receives readable evidence with labels. Python keeps the URL mapping.
     draft = (PROMPT | generator).invoke({
         "period": period, "question": question, "evidence": json.dumps(context), "gaps": json.dumps(gaps),
         "history": json.dumps(history),
@@ -74,6 +76,7 @@ def answer_question(question: str, period: str, passages: list[dict], generator,
         raise ValueError("The model returned an inconsistent answer.")
 
     citations = {}
+    # Validate that the cited label exists. Whether its text supports the claim is a separate check.
     for claim in draft.claims:
         if not claim.text.strip() or not claim.source_ids:
             raise ValueError("Every claim must have text and a citation.")

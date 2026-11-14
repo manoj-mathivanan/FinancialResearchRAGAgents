@@ -37,6 +37,7 @@ PROMPT = ChatPromptTemplate.from_messages([
 
 
 def investigate_financials(task: str, period: str, planner, load_snapshot) -> dict:
+    """Let the model choose the next action from the validated financial tool list."""
     try:
         snapshot = load_snapshot(period)
     except MissingFactError as exc:
@@ -46,6 +47,7 @@ def investigate_financials(task: str, period: str, planner, load_snapshot) -> di
     observations, passages, gaps = [], [], []
     attempted = set()
     for _ in range(MAX_TOOL_CALLS):
+        # Previous outputs tell the planner what it has collected and what remains.
         action = (PROMPT | planner).invoke({
             "task": task, "period": period, "observations": json.dumps(observations),
         })
@@ -61,6 +63,7 @@ def investigate_financials(task: str, period: str, planner, load_snapshot) -> di
             break
         attempted.add(key)
         observation = action.model_dump()
+        # The chosen action runs ordinary Python against reviewed filing facts.
         try:
             if action.tool == "compare_yoy":
                 calculation = compare_yoy(snapshot, action.metric, end)

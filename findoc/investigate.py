@@ -53,6 +53,7 @@ PLAN = ChatPromptTemplate.from_messages([
 
 
 def build_investigation(planner, generator, retrieve):
+    # In Research Team the parent graph composes the answer from these findings.
     finish = "compose" if generator is not None else END
 
     def run_search(state, query, target):
@@ -73,6 +74,7 @@ def build_investigation(planner, generator, retrieve):
         }
 
     def initial_search(state):
+        # Search once using the assignment before spending a model call on follow-ups.
         return run_search(state, state["question"], "Find management commentary about the question.")
 
     def plan_follow_up(state):
@@ -97,6 +99,7 @@ def build_investigation(planner, generator, retrieve):
         return run_search(state, decision.query.strip(), decision.evidence_to_find)
 
     def after_search(state):
+        # Python caps the search loop even if the model keeps asking for more.
         if len(state["searches"]) >= 1 + MAX_FOLLOW_UPS or not state["passages"]:
             return finish
         return "plan_follow_up"

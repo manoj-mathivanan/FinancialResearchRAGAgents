@@ -40,6 +40,8 @@ class Route(BaseModel):
 
 
 class ResearchState(TypedDict, total=False):
+    """One request: nodes read this state and return updates to specific fields."""
+
     history: list[dict]
     question: str
     period_hint: str | None
@@ -71,6 +73,8 @@ ROUTER_PROMPT = ChatPromptTemplate.from_messages([
 
 
 def build_workflow(router, generator, calculate, retrieve):
+    """Build Quick research with replaceable model and tool dependencies for tests."""
+
     def route_question(state):
         decision = (ROUTER_PROMPT | router).invoke({
             "question": state["question"], "periods": ", ".join(PERIODS),
@@ -90,6 +94,7 @@ def build_workflow(router, generator, calculate, retrieve):
         return update
 
     def next_steps(state):
+        # The model proposes a route; Python decides which graph edges are valid.
         if state.get("routing_gap"):
             return ["compose"]
         decision = state["route"]
@@ -158,6 +163,7 @@ def load_snapshot(period: str) -> dict:
             if snapshot[key] != other[key]:
                 raise ValueError(f"Financial snapshots differ in {key}.")
     if len(snapshots) > 1:
+        # Preserve the source of every fact when merging two compatible filings.
         snapshot = {
             **snapshot,
             "snapshot_id": "+".join(item["snapshot_id"] for item in snapshots),

@@ -30,6 +30,8 @@ class Assignment(BaseModel):
 
 
 class SupervisorState(TypedDict, total=False):
+    """One turn: the plan and specialist findings are passed to the answer node."""
+
     history: list[dict]
     question: str
     period_hint: str | None
@@ -56,6 +58,8 @@ PROMPT = ChatPromptTemplate.from_messages([
 
 
 def build_supervisor(supervisor, financial, management, generator):
+    """Build Research Team with injected specialists and a shared answer step."""
+
     def assign(state):
         plan = (PROMPT | supervisor).invoke({
             "question": state["question"], "periods": ", ".join(PERIODS),
@@ -92,6 +96,7 @@ def build_supervisor(supervisor, financial, management, generator):
         return {"management_findings": management(plan.management_task, plan.period_end)}
 
     def compose(state):
+        # Each branch writes its own findings. Compose reads both when both ran.
         finance = state.get("financial_findings", {})
         call = state.get("management_findings", {})
         gaps = [*finance.get("gaps", []), *call.get("gaps", [])]
@@ -126,6 +131,7 @@ def live_supervisor(model_name: str, dsn: str | None, *, provider: Provider = "o
     model = chat_model(model_name, provider)
 
     def structured(schema):
+        # The roles share one model client. Each call has its own prompt and response schema.
         return model.with_structured_output(schema, method="json_schema", strict=True)
 
     financial_planner = structured(FinancialAction)

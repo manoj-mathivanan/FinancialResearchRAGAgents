@@ -41,6 +41,7 @@ def read_call_pages(pdf: Path) -> tuple[str, list[tuple[int, str]]]:
         timeout=30,
     )
     pages = result.stdout.decode("utf-8").rstrip("\f\r\n").split("\f")
+    # Poppler separates PDF pages with form-feed characters. Preserve their numbering.
     matches = [
         (period, transcript) for period, transcript in TRANSCRIPTS.items()
         if len(pages) == transcript.total_pages
@@ -52,6 +53,7 @@ def read_call_pages(pdf: Path) -> tuple[str, list[tuple[int, str]]]:
 
     entries = []
     first_page = transcript.first_content_page
+    # Skip the filing cover material. Keep physical PDF pages for browser citations.
     for page_number, page in enumerate(pages[first_page - 1:], first_page):
         lines = [
             line for line in page.splitlines()
