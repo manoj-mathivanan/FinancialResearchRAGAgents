@@ -12,6 +12,25 @@ from findoc.research import Route, build_workflow, calculate_from_snapshot
 
 
 class ResearchTests(unittest.TestCase):
+    def test_follow_up_passes_history_to_router_and_answer(self):
+        history = [{"question": "How did revenue grow?", "answer": "8.90% growth.", "period_end": "2025-12-31"}]
+
+        def route(prompt):
+            self.assertIn("8.90% growth.", prompt.to_messages()[-1].content)
+            return Route(period_end="2025-12-31", metric="owners-profit", transcript_query=None)
+
+        def generate(prompt):
+            message = prompt.to_messages()[-1].content
+            self.assertIn("8.90% growth.", message)
+            self.assertIn("6654", message)
+            return Draft(status="answered", claims=[Claim(text="Profit declined.", source_ids=["S1"])])
+
+        graph = build_workflow(RunnableLambda(route), RunnableLambda(generate),
+                               calculate_from_snapshot, self.unexpected_call)
+        result = graph.invoke({"question": "What about profit?", "history": history})["result"]
+        self.assertEqual(result["calculation"]["metric"], "owners-profit")
+        self.assertEqual(result["sources"]["S1"]["inputs"]["current"]["value"], "6654")
+
     def run_route(self, decision, *, calculate, retrieve, generate, period_hint=None):
         graph = build_workflow(
             RunnableLambda(lambda _: decision), RunnableLambda(generate), calculate, retrieve

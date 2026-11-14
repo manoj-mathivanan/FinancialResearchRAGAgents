@@ -92,7 +92,15 @@ a.citation:hover { text-decoration: underline; }
 .answer-card { margin-top: 18px; padding: 20px 23px; line-height: 1.65; }
 .answer-card h2 { margin: 0; font-size: 19px; }
 .answer-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.asked { color: var(--muted); margin: 6px 0 16px; font-size: 13px; }
+.chat-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.chat-heading p { margin: 0; }
+.new-chat { flex: none; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--accent); padding: 5px 9px; }
+.chat-turn { margin: 0 0 18px; line-height: 1.6; overflow-wrap: anywhere; }
+.user-message { display: grid; justify-self: end; width: fit-content; max-width: 90%; background: var(--pale); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; }
+.user-message strong { color: var(--accent); font-size: 12px; }
+.chat-answer { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.chat-answer h2 { margin: 0; font-size: 15px; }
+.source-card:focus { outline: 2px solid var(--accent); }
 .claim { margin: 10px 0; }
 .claim .citation { margin-left: 3px; vertical-align: 1px; }
 .notice, .gaps { background: #f8f5e9; color: #5b4920; border-radius: 7px; padding: 9px 12px; }

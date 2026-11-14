@@ -116,10 +116,10 @@ function FilingRow({ fact }: { fact: FilingInput }) {
   </li>;
 }
 
-function SourceCard({ label, source }: { label: string; source: Citation }) {
+function SourceCard({ label, source, turn }: { label: string; source: Citation; turn: number }) {
   const isFiling = source.type === "filing_calculation" || source.type === "reported_fact";
   return (
-    <article className="source-card" id={`source-${label}`} tabIndex={-1}>
+    <article className="source-card" id={`source-${turn}-${label}`} tabIndex={-1}>
       <div className="source-heading"><span className="citation">{label}</span><strong>{isFiling ? "Financial filing" : "Earnings call"}</strong></div>
       {source.type === "filing_calculation"
         ? <ul className="filing-list"><FilingRow fact={source.inputs.prior} /><FilingRow fact={source.inputs.current} /></ul>
@@ -155,14 +155,18 @@ function WorkflowDetails({ answer }: { answer: Answer }) {
   </details>;
 }
 
+function answerQuarter(answer: Answer) {
+  return answer.assignment?.period_end ?? answer.route?.period_end ?? null;
+}
+
 function App() {
   const [periods, setPeriods] = useState<string[]>([]);
   const [period, setPeriod] = useState("");
   const [mode, setMode] = useState<Mode>("team");
   const [symbol, setSymbol] = useState("INFY");
   const [question, setQuestion] = useState("");
-  const [submitted, setSubmitted] = useState("");
-  const [answer, setAnswer] = useState<Answer>();
+  const [turns, setTurns] = useState<{ question: string; answer: Answer }[]>([]);
+  const [sourceTurn, setSourceTurn] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -180,19 +184,26 @@ function App() {
     const text = question.trim();
     setBusy(true);
     setError("");
-    setAnswer(undefined);
-    setSubmitted(text);
+    const history = turns.filter(turn => turn.answer.claims.length).slice(-3).map(turn => ({
+      question: turn.question,
+      answer: turn.answer.claims.map(claim => claim.text).join(" ").slice(0, 1200),
+      period_end: answerQuarter(turn.answer),
+    }));
     try {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, symbol, period_end: period || null, mode }),
+        body: JSON.stringify({ question: text, symbol, period_end: period || null, mode, history }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         throw new Error(typeof data?.detail === "string" ? data.detail : "Could not run this question. Please try again.");
       }
-      setAnswer(await response.json());
+      const answer: Answer = await response.json();
+      setTurns([...turns, { question: text, answer }]);
+      setSourceTurn(turns.length);
+      setQuestion("");
+      requestAnimationFrame(() => document.getElementById("question")?.focus());
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Research is unavailable. Please try again.");
     } finally {
@@ -200,8 +211,7 @@ function App() {
     }
   }
 
-  const sources = Object.entries(answer?.sources ?? {});
-  const answerPeriod = answer?.assignment?.period_end ?? answer?.route?.period_end;
+  const sources = Object.entries(turns[sourceTurn]?.answer.sources ?? {});
 
   return (
     <>
@@ -231,6 +241,12 @@ function App() {
               ))}</div>
             </section>
             <form className="ask-card" onSubmit={ask}>
+              <div className="chat-heading">
+                <p className="muted">Follow-ups use up to three recent answers. This chat clears when you reload.</p>
+                {turns.length > 0 && <button className="new-chat" type="button" disabled={busy} onClick={() => {
+                  setTurns([]); setSourceTurn(0); setPeriod(""); setQuestion(""); setError("");
+                }}>New chat</button>}
+              </div>
               <div className="controls">
                 <label className="period-control">Stock
                   <select value={symbol} onChange={event => setSymbol(event.target.value)} disabled={busy}>
@@ -239,16 +255,47 @@ function App() {
                 </label>
                 <label className="period-control">Reporting quarter
                   <select value={period} onChange={event => setPeriod(event.target.value)} disabled={busy}>
-                    <option value="">Infer from question</option>
+                    <option value="">Infer from chat</option>
                     {periods.map(value => <option key={value} value={value}>{formatQuarter(value)}</option>)}
                   </select>
                 </label>
               </div>
               <div className="question-mode"><ResearchMode name="mode" label="Research mode" mode={mode} onChange={setMode} disabled={busy} /></div>
-              <label className="question-label" htmlFor="question">Research question</label>
+            <div aria-live="polite" aria-busy={busy}>
+              {turns.map(({ question: asked, answer }, turn) => {
+                const answerPeriod = answerQuarter(answer);
+                return <div className="chat-turn" key={turn}>
+                  <p className="user-message"><strong>You</strong><span>{asked}</span></p>
+                  <section className="chat-answer">
+                    <div className="answer-heading">
+                      <h2>Research answer</h2>
+                      {answerPeriod && <span className="muted">{formatQuarter(answerPeriod)}</span>}
+                    </div>
+                    {answer.status === "insufficient_evidence" && <p className="notice">There isn’t enough evidence to answer this question.</p>}
+                    {answer.status === "partial" && <p className="notice">The available evidence answers part of the question.</p>}
+                    {answer.claims.map((claim, index) => <p className="claim" key={index}>
+                      {claim.text}{" "}
+                      {claim.source_ids.filter(id => id in answer.sources).map(id =>
+                        <a className="citation" href={`#source-${turn}-${id}`} key={id} aria-label={`See source ${id}`} onClick={event => {
+                          event.preventDefault();
+                          setSourceTurn(turn);
+                          const target = event.currentTarget.hash.slice(1);
+                          requestAnimationFrame(() => document.getElementById(target)?.focus());
+                        }}>{id}</a>
+                      )}
+                    </p>)}
+                    {!!answer.gaps?.length && <div className="gaps"><h3>Evidence gaps</h3><ul>{answer.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div>}
+                    <WorkflowDetails answer={answer} />
+                  </section>
+                </div>;
+              })}
+              {busy && <p className="loading"><span className="spinner" /> Finding evidence and drafting an answer…</p>}
+              {error && <p className="notice error" role="alert">{error}</p>}
+            </div>
+              <label className="question-label" htmlFor="question">{turns.length ? "Follow-up question" : "Research question"}</label>
               <div className="composer">
                 <textarea id="question" value={question} onChange={event => setQuestion(event.target.value)}
-                  placeholder="How did Infosys revenue change in the December 2025 quarter?" rows={3} maxLength={1200} disabled={busy} required />
+                  placeholder={turns.length ? "What about profit for the same quarter?" : "How did Infosys revenue change in the December 2025 quarter?"} rows={3} maxLength={1200} disabled={busy} required />
                 <div className="composer-footer">
                   <button className="ask-button" type="submit" disabled={busy || !question.trim()}>
                     {busy ? "Researching…" : "Ask FinDoc"} <ArrowRight size={16} />
@@ -256,33 +303,12 @@ function App() {
                 </div>
               </div>
             </form>
-            <div aria-live="polite" aria-busy={busy}>
-              {busy && <section className="answer-card loading"><span className="spinner" /> Finding evidence and drafting an answer…</section>}
-              {error && <section className="answer-card error" role="alert"><h2>Couldn’t complete the research</h2><p>{error}</p></section>}
-              {answer && <section className="answer-card">
-                <div className="answer-heading">
-                  <h2>Research answer</h2>
-                  {answerPeriod && <span className="muted">{formatQuarter(answerPeriod)}</span>}
-                </div>
-                <p className="asked">{submitted}</p>
-                {answer.status === "insufficient_evidence" && <p className="notice">There isn’t enough evidence to answer this question.</p>}
-                {answer.status === "partial" && <p className="notice">The available evidence answers part of the question.</p>}
-                {answer.claims.map((claim, index) => <p className="claim" key={index}>
-                  {claim.text}{" "}
-                  {claim.source_ids.filter(id => id in answer.sources).map(id =>
-                    <a className="citation" href={`#source-${id}`} key={id} aria-label={`See source ${id}`}>{id}</a>
-                  )}
-                </p>)}
-                {!!answer.gaps?.length && <div className="gaps"><h3>Evidence gaps</h3><ul>{answer.gaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div>}
-                <WorkflowDetails answer={answer} />
-              </section>}
-            </div>
           </section>
           <aside className="evidence-panel" aria-labelledby="sources-heading">
             <div className="panel-heading"><BookOpen size={18} /><h2 id="sources-heading">Source evidence</h2>{sources.length > 0 && <span className="source-count">{sources.length}</span>}</div>
             {sources.length
-              ? <div className="source-list">{sources.map(([label, source]) => <SourceCard label={label} source={source} key={label} />)}</div>
-              : <div className="empty-sources"><Search size={23} strokeWidth={1.5} /><p>{answer ? "This answer has no cited sources." : "Cited filings and transcript pages will appear here."}</p></div>}
+              ? <div className="source-list">{sources.map(([label, source]) => <SourceCard label={label} source={source} turn={sourceTurn} key={label} />)}</div>
+              : <div className="empty-sources"><Search size={23} strokeWidth={1.5} /><p>{turns.length ? "This answer has no cited sources." : "Cited filings and transcript pages will appear here."}</p></div>}
           </aside>
         </div>
         <QuarterlyBrief />

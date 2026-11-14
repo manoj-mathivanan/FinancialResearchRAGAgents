@@ -434,7 +434,7 @@ Sentiment deferral, provider-native rating granularity if revisited, no mandator
 
 ### Deferred features
 
-Conversational follow-ups and chat history are deferred. If added, use a separate session for each visitor so follow-ups can refer to earlier turns in that session. Decide separately whether to retain conversations across visits. The shared research index contains source evidence.
+FinDoc supports conversational follow-ups within one browser tab. Each request can include up to three recent answered turns for reference resolution. Each answer is grounded in evidence gathered for its own turn. Conversations clear on reload or New chat. Saving conversations across visits is deferred.
 
 The public demo uses GPT-OSS 20B through Groq. Further model-serving experiments are deferred.
 

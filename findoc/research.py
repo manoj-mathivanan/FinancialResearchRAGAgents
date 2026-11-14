@@ -40,6 +40,7 @@ class Route(BaseModel):
 
 
 class ResearchState(TypedDict, total=False):
+    history: list[dict]
     question: str
     period_hint: str | None
     route: Route
@@ -61,8 +62,11 @@ ROUTER_PROMPT = ChatPromptTemplate.from_messages([
      "when supplied. Otherwise infer the quarter end only when unambiguous. Return null for "
      "an unknown quarter or when the question requires more than one target quarter. "
      "For unrelated or unsupported requests such as stock prices, select neither tool. "
-     "Make a routing decision without answering the question."),
-    ("human", "Known quarter ends: {periods}\nPeriod hint: {period_hint}\nQuestion: {question}"),
+     "Use conversation history only to resolve references in the current question. The explicit "
+     "period hint takes precedence. A previous quarter is the three months before the referenced "
+     "quarter. If that quarter is unsupported, leave the period null without skipping to an older "
+     "indexed quarter. Make a routing decision without answering the question."),
+    ("human", "Known quarter ends: {periods}\nPeriod hint: {period_hint}\nConversation history: {history}\nQuestion: {question}"),
 ])
 
 
@@ -71,6 +75,7 @@ def build_workflow(router, generator, calculate, retrieve):
         decision = (ROUTER_PROMPT | router).invoke({
             "question": state["question"], "periods": ", ".join(PERIODS),
             "period_hint": state.get("period_hint") or "none",
+            "history": json.dumps(state.get("history", [])),
         })
         if not isinstance(decision, Route):
             raise ValueError("The routing model did not return a structured decision.")
@@ -120,7 +125,8 @@ def build_workflow(router, generator, calculate, retrieve):
         calculation = state.get("calculation")
         if calculation:
             passages.insert(0, calculation_passage(calculation))
-        result = answer_question(state["question"], decision.period_end or "", passages, generator, gaps=gaps)
+        result = answer_question(state["question"], decision.period_end or "", passages, generator,
+                                 gaps=gaps, history=state.get("history", []))
         if gaps and result["status"] == "answered":
             result["status"] = "partial"
         result.update(route=decision.model_dump(), gaps=gaps)

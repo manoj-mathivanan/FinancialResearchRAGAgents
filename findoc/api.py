@@ -22,11 +22,18 @@ from findoc.tools.transcripts import TRANSCRIPTS
 logger = logging.getLogger(__name__)
 
 
+class ConversationTurn(BaseModel):
+    question: str = Field(min_length=1, max_length=1200)
+    answer: str = Field(min_length=1, max_length=1200)
+    period_end: Literal["2024-12-31", "2025-03-31", "2025-12-31", "2026-03-31"] | None = None
+
+
 class Question(BaseModel):
     question: str = Field(min_length=1, max_length=1200)
     symbol: Literal["INFY"] = "INFY"
     period_end: str | None = None
     mode: Literal["quick", "team"] = "team"
+    history: list[ConversationTurn] = Field(default_factory=list, max_length=3)
 
     @field_validator("question")
     @classmethod
@@ -58,7 +65,11 @@ def run_question(request: Question) -> dict:
     default_model = GROQ_MODEL if provider == "groq" else DEFAULT_MODEL
     model = os.getenv("FINDOC_ANSWER_MODEL", default_model)
     workflow = workflow_for(request.mode, model, os.getenv("FINDOC_DATABASE_URL"), provider)
-    return workflow.invoke({"question": request.question, "period_hint": request.period_end})["result"]
+    return workflow.invoke({
+        "question": request.question,
+        "period_hint": request.period_end,
+        "history": [turn.model_dump() for turn in request.history],
+    })["result"]
 
 
 def create_app(answer=run_question) -> FastAPI:

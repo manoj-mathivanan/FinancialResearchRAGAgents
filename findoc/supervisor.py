@@ -30,6 +30,7 @@ class Assignment(BaseModel):
 
 
 class SupervisorState(TypedDict, total=False):
+    history: list[dict]
     question: str
     period_hint: str | None
     assignment: Assignment
@@ -46,8 +47,11 @@ PROMPT = ChatPromptTemplate.from_messages([
      "changes. The management specialist can search the earnings-call transcript and follow "
      "up on management's statements. Give each needed specialist a focused assignment, "
      "preserving every relevant part of the user's question. Use null for an unneeded "
-     "specialist and for an ambiguous reporting quarter. Use the period hint if given."),
-    ("human", "Known quarters: {periods}\nPeriod hint: {period_hint}\nQuestion: {question}"),
+     "specialist and for an ambiguous reporting quarter. Use the period hint if given. Use "
+     "conversation history only to resolve references, and spell these out in the assignments. "
+     "A previous quarter is the three months before the referenced quarter. If that quarter "
+     "is unsupported, leave the period null without skipping to an older indexed quarter."),
+    ("human", "Known quarters: {periods}\nPeriod hint: {period_hint}\nConversation history: {history}\nQuestion: {question}"),
 ])
 
 
@@ -56,6 +60,7 @@ def build_supervisor(supervisor, financial, management, generator):
         plan = (PROMPT | supervisor).invoke({
             "question": state["question"], "periods": ", ".join(PERIODS),
             "period_hint": state.get("period_hint") or "none",
+            "history": json.dumps(state.get("history", [])),
         })
         if not isinstance(plan, Assignment):
             raise ValueError("The supervisor did not return a structured assignment.")
@@ -94,7 +99,8 @@ def build_supervisor(supervisor, financial, management, generator):
             gaps.insert(0, state["assignment_gap"])
         passages = finance.get("passages", []) + call.get("passages", [])
         plan = state["assignment"]
-        result = answer_question(state["question"], plan.period_end or "", passages, generator, gaps=gaps)
+        result = answer_question(state["question"], plan.period_end or "", passages, generator,
+                                 gaps=gaps, history=state.get("history", []))
         if gaps and result["status"] == "answered":
             result["status"] = "partial"
         result.update(
