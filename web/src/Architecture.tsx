@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { ProductionReadiness } from "./ProductionReadiness";
 import { ResearchMode } from "./ResearchMode";
 import type { Mode } from "./ResearchMode";
 
@@ -62,6 +63,7 @@ export function Architecture() {
         </dl>
         <p className="architecture-baseline">Financial calculations read reviewed filing snapshots directly. The calculator uses Python for arithmetic. An LLM can choose the tool and explain its result.</p>
       </div>
+      <ProductionReadiness />
     </section>
   );
 }

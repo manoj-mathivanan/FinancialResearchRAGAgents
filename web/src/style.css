@@ -136,6 +136,14 @@ a.citation:hover { text-decoration: underline; }
 .architecture-rag dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr)); gap: 12px; }
 .architecture-rag dt { font-size: 14px; font-weight: 700; }
 .architecture-rag dd { margin: 2px 0 0; }
+.production-readiness { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px; }
+.production-readiness h3 { margin: 0; font-size: 16px; }
+.production-readiness p, .production-readiness dd { color: var(--muted); font-size: 14px; }
+.production-readiness p { margin: 4px 0 12px; }
+.production-readiness dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 255px), 1fr)); gap: 10px; margin: 0; }
+.production-readiness dl > div { background: #f5f8f4; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.production-readiness dt { font-size: 14px; font-weight: 700; }
+.production-readiness dd { margin: 3px 0 0; }
 .architecture-scroll { margin-top: 12px; }
 @media (max-width: 940px) {
   .architecture-scroll-hint { display: block; }
